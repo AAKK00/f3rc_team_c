@@ -2,13 +2,14 @@
 #include <Wire.h>
 #include <VL53L0X.h>
 #include <Adafruit_BNO055.h>
-#include <moter.h>
-#include <motermovement.h>
+#include "ooruidriver.h"
+#include "motormovement.h"
 #include <math.h>
-#include <Ticker.h>
+#include <stdio.h>
+//#include <Ticker.h>
 
 void getlocation();
-Ticker getlocationticker;
+//Ticker getlocationticker(getlocation, 50);
 
 /*
 #include <Ticker.h>
@@ -47,43 +48,39 @@ const int GPIO_MASK_ARRAY[SENSOR_NUM] = {SENSOR0, SENSOR1, SENSOR2, SENSOR3};
 VL53L0X gSensor[SENSOR_NUM]; // 使用するセンサークラス配列
 
 //モータのピンの設定
-#define moter0_0 13
-#define moter0_1 12
-#define moter0_2 14
-#define moter0_3 27
-#define moter1_0 26
-#define moter1_1 25
-#define moter1_2 33
-#define moter1_3 32
-#define moter2_0 15
-#define moter2_1 2
-#define moter2_2 0
-#define moter2_3 4
-#define moter3_0 16
-#define moter3_1 17
-#define moter3_2 5
-#define moter3_3 18
+#define motor0_0 13
+#define motor0_1 12
+
+#define motor1_0 26
+#define motor1_1 25
+
+#define motor2_0 15
+#define motor2_1 14
+
+#define motor3_0 16
+#define motor3_1 17
+
 
 //モーターのclass
-//Moter.h
-Moter moter0, moter1, moter2, moter3;
+//Motor.h
+ooruidriver motor0, motor1, motor2, motor3;
 //Motermovement.h
-Motermovement Drive;
+motormovement Drive;
 
 
 //距離センサーから得られた座標を保存しておく場所
-typedef struct TofDistance{
+struct TofDistance{
   int x0, x1, y0, y1;
 };
 
 //加速度センサーから得られた座標を保存しておく場所
-typedef struct Location{
+struct Location{
   double x, y, z;
 };
 
 //9軸センサーから得られた角度を保存しておく場所
 //基本的にはクオータニオンを利用して計算するのでほとんど使わない
-typedef struct Angles{
+struct Angles{
   double roll, yaw, pitch;
 };
 
@@ -166,15 +163,17 @@ void quat_to_euler(Angles *a, double w, double x, double y, double z) {
 double vxyz[3];
 //加速度センサーから得られた値を2回積分する vxyz[3]を関数内で定義すると、毎回初期化されてしまい値を保存できない
 
+
 void caliculate_location(Location *l, double vzyz[3], double accxyz[3], u_int8_t dt){
   for(int i = 0; i < 3; i++){
     vxyz[i] += accxyz[i] * dt / 1000;
   }
-  //確か単位がmなのでmmに直して、機体の大きさを考慮して足します
-  l->x += dt * vxyz[0] / 1000 * 100 + width / 2;
-  l->y += dt * vxyz[1] / 1000 * 100 + length / 2;
-  l->z += dt * vxyz[2] / 1000 * 100;
+
+  l->x += dt * vxyz[0] / 1000;
+  l->y += dt * vxyz[1] / 1000;
+  l->z += dt * vxyz[2] / 1000;
 }
+
 
 
 
@@ -208,6 +207,39 @@ void calib(Angles *a0, u_int8_t num, double calib_acc){
   a0->pitch = atan(a0xyz[2] / a0xyz[0]);
   a0->yaw   = atan(a0xyz[1] / a0xyz[2]);
 }
+
+
+
+void setup() {
+  // Wire(Arduino-I2C)の初期化
+  Wire.begin();
+  // デバッグ用シリアル通信は115200bps
+  Serial.begin(115200);
+
+
+  if(!bno.begin()) {
+    Serial.println("Cannot start BNO055!");
+  }
+
+  bno.setExtCrystalUse(true);
+
+  calib(&a0, 100, calib_acc);
+  
+  
+  if(!vl53l0xInit()){
+    Serial.println("VL53L0X initialization failed!");
+  }
+
+
+
+  motor0.set(motor0_0, motor0_1);
+  motor1.set(motor1_0, motor1_1);
+  motor2.set(motor2_0, motor2_1);
+  motor3.set(motor3_0, motor3_1);
+
+  Drive.set(motor0, motor1, motor2, motor3);
+}
+
 
 void getlocation() {
 
@@ -246,6 +278,9 @@ void getlocation() {
   {{cy*cp, cy*sp*sr - sy*cr, cy*sp*cr + sy*sr},
   {sy*cp, sr*sp*sy + cr*cy, sy*sp*cr - cy*sr},
   {-sp, cp*sr, cp*cr}};
+
+
+
 
 
   // 加速度センサ値の取得と表示
@@ -314,8 +349,9 @@ y1|            |y0
 
   */
 
-  double rotated_dis[3];
+
   int raw_dis[3];
+  double rotated_dis[3];
   if(dis.x0 == 8190 || dis.x0 == 0){
     raw_dis[0] = field_length - dis.x1 - length / 2;
   }
@@ -330,22 +366,33 @@ y1|            |y0
     raw_dis[1] = dis.y0 + width / 2;
   }
 
+
+  if (dis.x0 == 8190 && dis.x1 == 8190) {
+    Drive.stop();
+  } else if (dis.y0 == 8190 && dis.y1 == 8190) {
+    Drive.stop();
+  }
+
   raw_dis[2] = 0;
 
-
+  /*
   for(int i = 0; i < 3; i++) {
     for(int j = 0; j < 3; j++) {
     rotated_dis[i] += r[i][j] * raw_dis[j];
     }
   }
+  */
+
+  dis.x0 = raw_dis[0];
+  dis.y0 = raw_dis[1]; 
 
 
   
 
   Serial.print(" x from tof:");
-  Serial.print(rotated_dis[0]);
+  Serial.print(dis.x0);
   Serial.print(" y from tof:");
-  Serial.print(rotated_dis[1]);
+  Serial.print(dis.y0);
   Serial.println();
 
 
@@ -371,46 +418,97 @@ y1|            |y0
   Serial.print(xyz.z, 7);
   Serial.println();
 
-  Serial.println("---------------------------------------------------------------------------------");
-
   delay(100);
 
   pretime = millis();
 }
 
-void setup() {
-  // Wire(Arduino-I2C)の初期化
-  Wire.begin();
-  // デバッグ用シリアル通信は115200bps
-  Serial.begin(115200);
 
+int dest[5][2] = {{250, 1200}, {1200, 650}, {650, 600}, {600, 1200}, {1200, 1450}};
 
-  if(!bno.begin()) {
-    Serial.println("Cannot start BNO055!");
-  }
+float P_d = 0.3, P_r = 3.0;
 
-  bno.setExtCrystalUse(false);
+double pwm_max = 250;
 
-  calib(&a0, 100, calib_acc);
-  
-  
-  if(!vl53l0xInit()){
-    Serial.println("VL53L0X initialization failed!");
-  }
-
-  getlocationticker.attach(50, getlocation);
-
-
-
-  moter0.set(moter0_0, moter0_1, moter0_2, moter0_3);
-  moter1.set(moter1_0, moter1_1, moter1_2, moter1_3);
-  moter1.set(moter2_0, moter2_1, moter2_2, moter2_3);
-  moter1.set(moter3_0, moter3_1, moter3_2, moter3_3);
-
-  Drive.set(moter0, moter1, moter2, moter3);
-}
-
+float diff_x, diff_y, diff_rotate;
 
 void loop(){
   
+for (int i = 0; i < 5; i++) {
+    Serial.print("destination:");
+    Serial.print(dest[i][0]);
+    Serial.print(", ");
+    Serial.println(dest[i][1]);
+    
+    if (i == 0){
+      while (abs(diff_x) > 10.0) {
+        getlocation();
+        diff_x = dest[i][0] - dis.x0 * P_d;
+        diff_y = dest[i][1] - dis.y0 * P_d;
+        if (diff_y>= pwm_max) {
+          diff_y = pwm_max;
+        }
+        Drive.forward(diff_y);
+        if (abs(diff_x) > 0.5) {
+          if (diff_x >= 0) {
+            if (diff_x >= pwm_max){
+              diff_x = pwm_max;
+            }
+          Drive.left(diff_x);
+          } else if (diff_x < 0) {
+            Drive.right(abs(diff_x));
+          }
+        }
+      }
+      Serial.println("i = 0 : done");
+    }
+
+
+    while (rpy.yaw < 89.0 && 91.0 < rpy.yaw) {
+      diff_rotate = 90 - rpy.yaw * P_r;
+      if (diff_rotate >= pwm_max) {
+        diff_rotate = pwm_max;
+      }
+      Drive.ccw(diff_rotate);
+    }
+    Serial.println("rotate : done");
+
+    if (i == 1){
+      while (abs(diff_x) > 10.0) {
+        getlocation();
+        diff_x = dest[i][0] - dis.x0 * P_d;
+        diff_y = dest[i][1] - dis.y0 * P_d;
+        if (diff_x >= pwm_max) {
+          diff_x = pwm_max;
+        }
+        Drive.forward(diff_x);
+        if (abs(diff_y) > 90) {
+          if (diff_y >= 0) {
+            if (diff_y >= pwm_max){
+              diff_y = pwm_max;
+            }
+          Drive.left(diff_y);
+          } else if (diff_y < 0) {
+            Drive.right(abs(diff_y));
+          }
+        }
+      }
+      Serial.println("i = 1 : done");
+    }
+
+    while (-1.0 < rpy.yaw && rpy.yaw < 1.0) {
+      diff_rotate = 90 - rpy.yaw * P_r;
+      if (diff_rotate >= pwm_max) {
+        diff_rotate = pwm_max;
+      }
+      Drive.cw(diff_rotate);
+    }
+    Serial.println("rotate : done");
+
+    if (i == 5) {
+      while (1) {
+        //最後に停止させるためにループにする
+      }
+    }
+  }
 }
