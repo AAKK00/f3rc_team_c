@@ -20,8 +20,8 @@ void VL53L0X_Get();
 Ticker VL53L0Xticker(VL53L0X_Get, 0); 
 */
 
-#define width 500
-#define length 500
+#define width 420
+#define length 375
 #define field_width 2100
 #define field_length 2400
 
@@ -39,10 +39,10 @@ Adafruit_BNO055 bno = Adafruit_BNO055(55, 0x28);
 #define SENSOR_NUM  4
 
 //使用する距離センサーのリセットのピン
-#define SENSOR0 23
+#define SENSOR0 21
 #define SENSOR1 19
 #define SENSOR2 18
-#define SENSOR3 17
+#define SENSOR3 22
 
 const int GPIO_MASK_ARRAY[SENSOR_NUM] = {SENSOR0, SENSOR1, SENSOR2, SENSOR3};
 VL53L0X gSensor[SENSOR_NUM]; // 使用するセンサークラス配列
@@ -54,11 +54,15 @@ VL53L0X gSensor[SENSOR_NUM]; // 使用するセンサークラス配列
 #define motor1_0 26
 #define motor1_1 25
 
-#define motor2_0 15
-#define motor2_1 14
+#define motor2_0 26
+#define motor2_1 25
 
-#define motor3_0 16
-#define motor3_1 17
+#define motor3_0 33
+#define motor3_1 32
+
+#define pick 4
+#define arm_push 16
+#define eject 17
 
 
 //モーターのclass
@@ -159,7 +163,7 @@ void quat_to_euler(Angles *a, double w, double x, double y, double z) {
   */
 }
 
-
+/*
 double vxyz[3];
 //加速度センサーから得られた値を2回積分する vxyz[3]を関数内で定義すると、毎回初期化されてしまい値を保存できない
 
@@ -173,6 +177,7 @@ void caliculate_location(Location *l, double vzyz[3], double accxyz[3], u_int8_t
   l->y += dt * vxyz[1] / 1000;
   l->z += dt * vxyz[2] / 1000;
 }
+*/
 
 
 
@@ -189,7 +194,7 @@ Location xyz;
 double g = 9.806;
 double calib_acc;
 
-
+/*
 void calib(Angles *a0, u_int8_t num, double calib_acc){
   delay(1000);
   double a0xyz[3];
@@ -207,6 +212,7 @@ void calib(Angles *a0, u_int8_t num, double calib_acc){
   a0->pitch = atan(a0xyz[2] / a0xyz[0]);
   a0->yaw   = atan(a0xyz[1] / a0xyz[2]);
 }
+*/
 
 
 
@@ -223,7 +229,7 @@ void setup() {
 
   bno.setExtCrystalUse(true);
 
-  calib(&a0, 100, calib_acc);
+  //calib(&a0, 100, calib_acc);
   
   
   if(!vl53l0xInit()){
@@ -238,6 +244,10 @@ void setup() {
   motor3.set(motor3_0, motor3_1);
 
   Drive.set(motor0, motor1, motor2, motor3);
+
+  pinMode(arm_push, OUTPUT);
+  pinMode(pick, OUTPUT);
+  pinMode(eject, OUTPUT);
 }
 
 
@@ -263,6 +273,7 @@ void getlocation() {
                     
   */
 
+ /*
   double 
   sr = sin(-rpy.roll - a0.roll),
   cr = cos(-rpy.roll - a0.roll),
@@ -278,13 +289,14 @@ void getlocation() {
   {{cy*cp, cy*sp*sr - sy*cr, cy*sp*cr + sy*sr},
   {sy*cp, sr*sp*sy + cr*cy, sy*sp*cr - cy*sr},
   {-sp, cp*sr, cp*cr}};
+  */
 
 
 
 
 
   // 加速度センサ値の取得と表示
-  imu::Vector<3> accelermetor = bno.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);
+  //imu::Vector<3> accelermetor = bno.getVector(Adafruit_BNO055::VECTOR_ACCELEROMETER);
   /*
   Serial.print("Ac_xyz:");
   Serial.print(accelermetor.x());
@@ -294,7 +306,7 @@ void getlocation() {
   Serial.print(accelermetor.z());
   */
 
-
+  /*
   //rotated_locationは右手系です
   double rotated_accel[3], raw_accel[3];
 
@@ -318,6 +330,7 @@ void getlocation() {
       rotated_accel[i] = 0.0;
     }
   }
+  */
 
 
   Serial.print(rpy.roll);
@@ -366,12 +379,29 @@ y1|            |y0
     raw_dis[1] = dis.y0 + width / 2;
   }
 
+  if (45.0 < rpy.yaw && rpy.yaw < 135.0) {
+    if(dis.x0 == 8190 || dis.x0 == 0){
+      raw_dis[0] = field_width - dis.x1 - length / 2;
+    }
+    else{
+      raw_dis[0] = dis.x0 + length / 2;
+    }
 
+    if(dis.y0 == 8190 || dis.y0 == 0){
+      raw_dis[1] = field_length - dis.x1 - width / 2;
+    }
+    else{
+      raw_dis[1] = dis.y0 + width / 2;
+    }
+  }
+
+  /*
   if (dis.x0 == 8190 && dis.x1 == 8190) {
     Drive.stop();
   } else if (dis.y0 == 8190 && dis.y1 == 8190) {
     Drive.stop();
   }
+  */
 
   raw_dis[2] = 0;
 
@@ -400,7 +430,7 @@ y1|            |y0
 
   u_int8_t dt = millis() - pretime;
 
-  caliculate_location(&xyz, vxyz, rotated_accel, dt);
+  //caliculate_location(&xyz, vxyz, rotated_accel, dt);
 
   /*
   double ratio = 0.5;
@@ -428,87 +458,242 @@ int dest[5][2] = {{250, 1200}, {1200, 650}, {650, 600}, {600, 1200}, {1200, 1450
 
 float P_d = 0.3, P_r = 3.0;
 
-double pwm_max = 250;
+double pwm_max = 200;
 
 float diff_x, diff_y, diff_rotate;
 
 void loop(){
+  digitalWrite(pick, LOW);
+  digitalWrite(arm_push, LOW);
+  digitalWrite(eject, LOW);
   
 for (int i = 0; i < 5; i++) {
-    Serial.print("destination:");
+    Serial.print("destination : ");
     Serial.print(dest[i][0]);
     Serial.print(", ");
     Serial.println(dest[i][1]);
     
     if (i == 0){
-      while (abs(diff_x) > 10.0) {
+      while (abs(diff_y) > 20.0) {
         getlocation();
-        diff_x = dest[i][0] - dis.x0 * P_d;
-        diff_y = dest[i][1] - dis.y0 * P_d;
-        if (diff_y>= pwm_max) {
+        diff_x = (dis.x0 - dest[i][0]) * P_d;
+        diff_y = (dis.y0 - dest[i][1]) * P_d;
+        if (diff_y > pwm_max) {
+          for (diff_y = 0; diff_y < pwm_max; diff_y++) {
+            Drive.forward(diff_y);
+            delay(10);
+          }
+          break;
           diff_y = pwm_max;
+        } else if (diff_y <= pwm_max) {
+          Drive.forward(diff_y);
         }
-        Drive.forward(diff_y);
-        if (abs(diff_x) > 0.5) {
+         
+        if (abs(diff_x) > 50.0) {
           if (diff_x >= 0) {
             if (diff_x >= pwm_max){
               diff_x = pwm_max;
             }
           Drive.left(diff_x);
           } else if (diff_x < 0) {
+            if (abs(diff_x) >= pwm_max) {
+              diff_x = pwm_max;
+            }
             Drive.right(abs(diff_x));
           }
         }
       }
-      Serial.println("i = 0 : done");
-    }
+      Serial.println("i == 0 : done");
+    } 
 
 
-    while (rpy.yaw < 89.0 && 91.0 < rpy.yaw) {
+    while (diff_rotate >= 2.0) {
       diff_rotate = 90 - rpy.yaw * P_r;
-      if (diff_rotate >= pwm_max) {
-        diff_rotate = pwm_max;
+      if (diff_rotate > pwm_max) {
+          for (diff_rotate = 0; diff_rotate < pwm_max; diff_rotate++) {
+            Drive.ccw(diff_rotate);
+            delay(10);
+          }
+          break;
+          diff_rotate = pwm_max;
+      } else if (diff_rotate <= pwm_max) {
+          Drive.ccw(diff_rotate);
       }
-      Drive.ccw(diff_rotate);
     }
-    Serial.println("rotate : done");
 
-    if (i == 1){
-      while (abs(diff_x) > 10.0) {
+    if (i == 1) {
+      while (abs(diff_y) > 20.0) {
         getlocation();
-        diff_x = dest[i][0] - dis.x0 * P_d;
-        diff_y = dest[i][1] - dis.y0 * P_d;
-        if (diff_x >= pwm_max) {
-          diff_x = pwm_max;
+        diff_x = (dis.x0 - dest[i][0]) * P_d;
+        diff_y = (dis.y0 - dest[i][1]) * P_d;
+        if (diff_y > pwm_max) {
+          for (diff_y = 0; diff_y < pwm_max; diff_y++) {
+            Drive.forward(diff_y);
+            delay(10);
+          }
+          break;
+          diff_y = pwm_max;
+        } else if (diff_y <= pwm_max) {
+          Drive.forward(diff_y);
         }
-        Drive.forward(diff_x);
-        if (abs(diff_y) > 90) {
-          if (diff_y >= 0) {
-            if (diff_y >= pwm_max){
-              diff_y = pwm_max;
+         
+        if (abs(diff_x) > 50.0) {
+          if (diff_x >= 0) {
+            if (diff_x >= pwm_max){
+              diff_x = pwm_max;
             }
-          Drive.left(diff_y);
-          } else if (diff_y < 0) {
-            Drive.right(abs(diff_y));
+          Drive.left(diff_x);
+          } else if (diff_x < 0) {
+            if (abs(diff_x) >= pwm_max) {
+              diff_x = pwm_max;
+            }
+            Drive.right(abs(diff_x));
+          }
+        } 
+      }
+      Serial.println("i == 1 : done");
+    }
+
+    while (diff_rotate >= 2.0) {
+      diff_rotate = 0 - rpy.yaw * P_r;
+      if (diff_rotate > pwm_max) {
+          for (diff_rotate = 0; diff_rotate < pwm_max; diff_rotate++) {
+            Drive.cw(diff_rotate);
+            delay(10);
+          }
+          break;
+          diff_rotate = pwm_max;
+        } else if (diff_rotate <= pwm_max) {
+          Drive.cw(diff_rotate);
+      }
+    }
+
+    if (i == 2) {
+      while (abs(diff_y) > 20.0) {
+        getlocation();
+        diff_x = (dis.x0 - dest[i][0]) * P_d;
+        diff_y = (dis.y0 - dest[i][1]) * P_d;
+        if (diff_y > pwm_max) {
+          for (diff_y = 0; diff_y < pwm_max; diff_y++) {
+            Drive.forward(diff_y);
+            delay(10);
+          }
+          break;
+          diff_y = pwm_max;
+        } else if (diff_y <= pwm_max) {
+          Drive.forward(diff_y);
+        }
+         
+        if (abs(diff_x) > 50.0) {
+          if (diff_x >= 0) {
+            if (diff_x >= pwm_max){
+              diff_x = pwm_max;
+            }
+          Drive.left(diff_x);
+          } else if (diff_x < 0) {
+            if (abs(diff_x) >= pwm_max) {
+              diff_x = pwm_max;
+            }
+            Drive.right(abs(diff_x));
           }
         }
       }
-      Serial.println("i = 1 : done");
+      Serial.println("i == 2 : done");
     }
 
-    while (-1.0 < rpy.yaw && rpy.yaw < 1.0) {
+    digitalWrite(arm_push, HIGH);
+    delay(100);
+    digitalWrite(pick, HIGH);
+    delay(2000);
+    digitalWrite(arm_push, LOW);
+    delay(1000);
+
+    if (i == 3) {
+      while (abs(diff_y) > 20.0) {
+        getlocation();
+        diff_x = (dis.x0 - dest[i][0]) * P_d;
+        diff_y = (dis.y0 - dest[i][1]) * P_d;
+        if (diff_y > pwm_max) {
+          for (diff_y = 0; diff_y < pwm_max; diff_y++) {
+            Drive.back(diff_y);
+            delay(10);
+          }
+          break;
+          diff_y = pwm_max;
+        } else if (diff_y <= pwm_max) {
+          Drive.back(diff_y);
+        }
+         
+        if (abs(diff_x) > 50.0) {
+          if (diff_x >= 0) {
+            if (diff_x >= pwm_max){
+              diff_x = pwm_max;
+            }
+          Drive.left(diff_x);
+          } else if (diff_x < 0) {
+            if (abs(diff_x) >= pwm_max) {
+              diff_x = pwm_max;
+            }
+            Drive.right(abs(diff_x));
+          }
+        }
+      }
+      Serial.println("i == 3 : done");
+    }
+
+    while (diff_rotate >= 2.0) {
       diff_rotate = 90 - rpy.yaw * P_r;
-      if (diff_rotate >= pwm_max) {
-        diff_rotate = pwm_max;
+      if (diff_rotate > pwm_max) {
+          for (diff_rotate = 0; diff_rotate < pwm_max; diff_rotate++) {
+            Drive.cw(diff_rotate);
+            delay(10);
+          }
+          break;
+          diff_rotate = pwm_max;
+        } else if (diff_rotate <= pwm_max) {
+          Drive.cw(diff_rotate);
+        }
       }
-      Drive.cw(diff_rotate);
+    
+    if (i == 4) {
+      while (abs(diff_y) > 20.0) {
+        getlocation();
+        diff_x = (dis.x0 - dest[i][0]) * P_d;
+        diff_y = (dis.y0 - dest[i][1]) * P_d;
+        if (diff_y > pwm_max) {
+          for (diff_y = 0; diff_y < pwm_max; diff_y++) {
+            Drive.forward(diff_y);
+            delay(10);
+          }
+          break;
+          diff_y = pwm_max;
+        } else if (diff_y <= pwm_max) {
+          Drive.forward(diff_y);
+        }
+         
+        if (abs(diff_x) > 50.0) {
+          if (diff_x >= 0) {
+            if (diff_x >= pwm_max){
+              diff_x = pwm_max;
+            }
+          Drive.left(diff_x);
+          } else if (diff_x < 0) {
+            if (abs(diff_x) >= pwm_max) {
+              diff_x = pwm_max;
+            }
+            Drive.right(abs(diff_x));
+          }
+        }
+      }
+      Serial.println("i == 4 : done");
     }
-    Serial.println("rotate : done");
 
-    if (i == 5) {
-      while (1) {
-        //最後に停止させるためにループにする
-      }
-    }
+    digitalWrite(eject, HIGH);
+    delay(900);
+    digitalWrite(eject, LOW);
+  }
+  while (1) {
+    Serial.println("BON APPETIT");
+        delay(1000);
   }
 }
