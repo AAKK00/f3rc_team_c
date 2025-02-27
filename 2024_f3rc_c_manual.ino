@@ -134,8 +134,6 @@ void loop() {
           Drive.left(level);
           Serial.println("left");
         }
-      } else {
-        Drive.stop();
       }
 
       Serial.print("joyRHori rate: ");
@@ -191,6 +189,7 @@ void loop() {
     Serial.println("not connected");
     if (xboxController.getCountFailedConnection() > 2) {
       ESP.restart();
+      Drive.stop();
     }
   }
   delay(100);
