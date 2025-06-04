@@ -462,238 +462,119 @@ double pwm_max = 200;
 
 float diff_x, diff_y, diff_rotate;
 
+void move_to_destination(int targetX, int targetY, bool forward = true) {
+  while (abs(diff_y) > 20.0) {
+    getlocation();
+    diff_x = (dis.x0 - targetX) * P_d;
+    diff_y = (dis.y0 - targetY) * P_d;
+
+    if (diff_y > pwm_max) {
+      for (float p = 0; p < pwm_max; p++) {
+        if (forward) {
+          Drive.forward(p);
+        } else {
+          Drive.back(p);
+        }
+        delay(10);
+      }
+      break;
+    } else {
+      if (forward) {
+        Drive.forward(diff_y);
+      } else {
+        Drive.back(diff_y);
+      }
+    }
+
+    if (abs(diff_x) > 50.0) {
+      if (diff_x >= 0) {
+        if (diff_x >= pwm_max) {
+          diff_x = pwm_max;
+        }
+        Drive.left(diff_x);
+      } else {
+        if (abs(diff_x) >= pwm_max) {
+          diff_x = pwm_max;
+        }
+        Drive.right(abs(diff_x));
+      }
+    }
+  }
+}
+
 void loop(){
   digitalWrite(pick, LOW);
   digitalWrite(arm_push, LOW);
   digitalWrite(eject, LOW);
-  
-for (int i = 0; i < 5; i++) {
+
+  for (int i = 0; i < 5; i++) {
     Serial.print("destination : ");
     Serial.print(dest[i][0]);
     Serial.print(", ");
     Serial.println(dest[i][1]);
-    
-    if (i == 0){
-      while (abs(diff_y) > 20.0) {
-        getlocation();
-        diff_x = (dis.x0 - dest[i][0]) * P_d;
-        diff_y = (dis.y0 - dest[i][1]) * P_d;
-        if (diff_y > pwm_max) {
-          for (diff_y = 0; diff_y < pwm_max; diff_y++) {
-            Drive.forward(diff_y);
-            delay(10);
-          }
-          break;
-          diff_y = pwm_max;
-        } else if (diff_y <= pwm_max) {
-          Drive.forward(diff_y);
-        }
-         
-        if (abs(diff_x) > 50.0) {
-          if (diff_x >= 0) {
-            if (diff_x >= pwm_max){
-              diff_x = pwm_max;
-            }
-          Drive.left(diff_x);
-          } else if (diff_x < 0) {
-            if (abs(diff_x) >= pwm_max) {
-              diff_x = pwm_max;
-            }
-            Drive.right(abs(diff_x));
-          }
-        }
-      }
-      Serial.println("i == 0 : done");
-    } 
 
+    bool forward = (i != 3);
+    move_to_destination(dest[i][0], dest[i][1], forward);
 
-    while (diff_rotate >= 2.0) {
-      diff_rotate = 90 - rpy.yaw * P_r;
-      if (diff_rotate > pwm_max) {
+    Serial.print("i == ");
+    Serial.print(i);
+    Serial.println(" : done");
+
+    if (i == 0) {
+      while (diff_rotate >= 2.0) {
+        diff_rotate = 90 - rpy.yaw * P_r;
+        if (diff_rotate > pwm_max) {
           for (diff_rotate = 0; diff_rotate < pwm_max; diff_rotate++) {
             Drive.ccw(diff_rotate);
             delay(10);
           }
           break;
-          diff_rotate = pwm_max;
-      } else if (diff_rotate <= pwm_max) {
+        } else {
           Drive.ccw(diff_rotate);
-      }
-    }
-
-    if (i == 1) {
-      while (abs(diff_y) > 20.0) {
-        getlocation();
-        diff_x = (dis.x0 - dest[i][0]) * P_d;
-        diff_y = (dis.y0 - dest[i][1]) * P_d;
-        if (diff_y > pwm_max) {
-          for (diff_y = 0; diff_y < pwm_max; diff_y++) {
-            Drive.forward(diff_y);
-            delay(10);
-          }
-          break;
-          diff_y = pwm_max;
-        } else if (diff_y <= pwm_max) {
-          Drive.forward(diff_y);
         }
-         
-        if (abs(diff_x) > 50.0) {
-          if (diff_x >= 0) {
-            if (diff_x >= pwm_max){
-              diff_x = pwm_max;
-            }
-          Drive.left(diff_x);
-          } else if (diff_x < 0) {
-            if (abs(diff_x) >= pwm_max) {
-              diff_x = pwm_max;
-            }
-            Drive.right(abs(diff_x));
-          }
-        } 
       }
-      Serial.println("i == 1 : done");
-    }
-
-    while (diff_rotate >= 2.0) {
-      diff_rotate = 0 - rpy.yaw * P_r;
-      if (diff_rotate > pwm_max) {
+    } else if (i == 1) {
+      while (diff_rotate >= 2.0) {
+        diff_rotate = 0 - rpy.yaw * P_r;
+        if (diff_rotate > pwm_max) {
           for (diff_rotate = 0; diff_rotate < pwm_max; diff_rotate++) {
             Drive.cw(diff_rotate);
             delay(10);
           }
           break;
-          diff_rotate = pwm_max;
-        } else if (diff_rotate <= pwm_max) {
+        } else {
           Drive.cw(diff_rotate);
-      }
-    }
-
-    if (i == 2) {
-      while (abs(diff_y) > 20.0) {
-        getlocation();
-        diff_x = (dis.x0 - dest[i][0]) * P_d;
-        diff_y = (dis.y0 - dest[i][1]) * P_d;
-        if (diff_y > pwm_max) {
-          for (diff_y = 0; diff_y < pwm_max; diff_y++) {
-            Drive.forward(diff_y);
-            delay(10);
-          }
-          break;
-          diff_y = pwm_max;
-        } else if (diff_y <= pwm_max) {
-          Drive.forward(diff_y);
-        }
-         
-        if (abs(diff_x) > 50.0) {
-          if (diff_x >= 0) {
-            if (diff_x >= pwm_max){
-              diff_x = pwm_max;
-            }
-          Drive.left(diff_x);
-          } else if (diff_x < 0) {
-            if (abs(diff_x) >= pwm_max) {
-              diff_x = pwm_max;
-            }
-            Drive.right(abs(diff_x));
-          }
         }
       }
-      Serial.println("i == 2 : done");
-    }
-
-    digitalWrite(arm_push, HIGH);
-    delay(100);
-    digitalWrite(pick, HIGH);
-    delay(2000);
-    digitalWrite(arm_push, LOW);
-    delay(1000);
-
-    if (i == 3) {
-      while (abs(diff_y) > 20.0) {
-        getlocation();
-        diff_x = (dis.x0 - dest[i][0]) * P_d;
-        diff_y = (dis.y0 - dest[i][1]) * P_d;
-        if (diff_y > pwm_max) {
-          for (diff_y = 0; diff_y < pwm_max; diff_y++) {
-            Drive.back(diff_y);
-            delay(10);
-          }
-          break;
-          diff_y = pwm_max;
-        } else if (diff_y <= pwm_max) {
-          Drive.back(diff_y);
-        }
-         
-        if (abs(diff_x) > 50.0) {
-          if (diff_x >= 0) {
-            if (diff_x >= pwm_max){
-              diff_x = pwm_max;
-            }
-          Drive.left(diff_x);
-          } else if (diff_x < 0) {
-            if (abs(diff_x) >= pwm_max) {
-              diff_x = pwm_max;
-            }
-            Drive.right(abs(diff_x));
-          }
-        }
-      }
-      Serial.println("i == 3 : done");
-    }
-
-    while (diff_rotate >= 2.0) {
-      diff_rotate = 90 - rpy.yaw * P_r;
-      if (diff_rotate > pwm_max) {
+    } else if (i == 2) {
+      digitalWrite(arm_push, HIGH);
+      delay(100);
+      digitalWrite(pick, HIGH);
+      delay(2000);
+      digitalWrite(arm_push, LOW);
+      delay(1000);
+    } else if (i == 3) {
+      while (diff_rotate >= 2.0) {
+        diff_rotate = 90 - rpy.yaw * P_r;
+        if (diff_rotate > pwm_max) {
           for (diff_rotate = 0; diff_rotate < pwm_max; diff_rotate++) {
             Drive.cw(diff_rotate);
             delay(10);
           }
           break;
-          diff_rotate = pwm_max;
-        } else if (diff_rotate <= pwm_max) {
+        } else {
           Drive.cw(diff_rotate);
         }
       }
-    
-    if (i == 4) {
-      while (abs(diff_y) > 20.0) {
-        getlocation();
-        diff_x = (dis.x0 - dest[i][0]) * P_d;
-        diff_y = (dis.y0 - dest[i][1]) * P_d;
-        if (diff_y > pwm_max) {
-          for (diff_y = 0; diff_y < pwm_max; diff_y++) {
-            Drive.forward(diff_y);
-            delay(10);
-          }
-          break;
-          diff_y = pwm_max;
-        } else if (diff_y <= pwm_max) {
-          Drive.forward(diff_y);
-        }
-         
-        if (abs(diff_x) > 50.0) {
-          if (diff_x >= 0) {
-            if (diff_x >= pwm_max){
-              diff_x = pwm_max;
-            }
-          Drive.left(diff_x);
-          } else if (diff_x < 0) {
-            if (abs(diff_x) >= pwm_max) {
-              diff_x = pwm_max;
-            }
-            Drive.right(abs(diff_x));
-          }
-        }
-      }
-      Serial.println("i == 4 : done");
     }
 
     digitalWrite(eject, HIGH);
     delay(900);
     digitalWrite(eject, LOW);
   }
+
   while (1) {
     Serial.println("BON APPETIT");
-        delay(1000);
+    delay(1000);
   }
 }
